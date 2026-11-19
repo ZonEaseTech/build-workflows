@@ -22,5 +22,5 @@ docker run --rm --init --cap-drop NET_RAW \
       apt-get install -y -qq python3
       npx --yes playwright install-deps chromium
     fi
-    bash scripts/ci-build.sh /out
+    bash scripts/ci-build.sh /out || { rc=$?; for log in /tmp/dev.log /tmp/model.log; do if test -f "$log"; then tail -80 "$log"; fi; done; exit "$rc"; }
   ' >"$dir/build.log" 2>&1
