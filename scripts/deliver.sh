@@ -26,7 +26,9 @@ done
 verify=$(mktemp -d)
 gh api --paginate "repos/$repo/releases/$release/assets?per_page=100" --jq '.[]|[.id,.name]|@tsv' > "$dir/assets"
 while IFS=$'\t' read -r id name; do
-  gh api -H 'Accept: application/octet-stream' "repos/$repo/releases/assets/$id" > "$verify/$name"
+  curl --fail --silent --show-error --location --retry 3 \
+    -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/octet-stream' \
+    "https://api.github.com/repos/$repo/releases/assets/$id" -o "$verify/$name"
 done < "$dir/assets"
 cmp SHA256SUMS "$verify/SHA256SUMS"
 (cd "$verify" && sha256sum --check --status SHA256SUMS)
