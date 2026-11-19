@@ -8,7 +8,10 @@ on:
         options: [skills, shiftly-landing]
         required: true
       sha:
-        description: Approved main commit (empty selects current main)
+        description: Exact approved commit (required with pr; otherwise empty selects main)
+        type: string
+      pr:
+        description: Reviewed same-repository PR number (empty builds main)
         type: string
       diagnostic_test:
         description: Verify private failure diagnostics
@@ -28,6 +31,7 @@ jobs:
     env:
       PROJECT: ${{ inputs.project }}
       EXPECTED_SHA: ${{ inputs.sha }}
+      PR_NUMBER: ${{ inputs.pr }}
       PROBE: ${{ inputs.diagnostic_test }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,6 +42,9 @@ jobs:
         run: |
           case "$PROJECT" in skills|shiftly-landing) ;; *) exit 1 ;; esac
           [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ -n "$PR_NUMBER" ]]; then
+            [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          fi
       - name: Authorize source read
         id: reader
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
