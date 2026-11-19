@@ -1,0 +1,72 @@
+name: Build private release candidates
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project
+        type: choice
+        options: [skills, shiftly-landing]
+        required: true
+      sha:
+        description: Approved main commit (empty selects current main)
+        type: string
+      diagnostic_test:
+        description: Verify private failure diagnostics
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ inputs.project }}-${{ inputs.sha || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    environment: private-build
+    env:
+      PROJECT: ${{ inputs.project }}
+      EXPECTED_SHA: ${{ inputs.sha }}
+      PROBE: ${{ inputs.diagnostic_test }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          token: ${{ github.token }}
+      - name: Validate request
+        run: |
+          case "$PROJECT" in skills|shiftly-landing) ;; *) exit 1 ;; esac
+          [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - name: Authorize source read
+        id: reader
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ secrets.BUILD_APP_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: ZonEaseTech
+          repositories: ${{ inputs.project }}
+          permission-contents: read
+      - name: Resolve approved source
+        env:
+          GH_TOKEN: ${{ steps.reader.outputs.token }}
+        run: bash scripts/source.sh
+      - name: Build and test in an isolated container
+        id: compile
+        run: bash scripts/build.sh
+      - name: Authorize private delivery
+        if: ${{ !cancelled() && steps.compile.outcome != 'skipped' }}
+        id: writer
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ secrets.BUILD_APP_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: ZonEaseTech
+          repositories: ${{ inputs.project }}
+          permission-contents: write
+      - name: Deliver private files and verify the download
+        if: ${{ !cancelled() && steps.writer.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.writer.outputs.token }}
+          BUILD_STATUS: ${{ steps.compile.outcome }}
+        run: bash scripts/deliver.sh
