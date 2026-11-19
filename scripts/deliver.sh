@@ -37,6 +37,7 @@ while IFS=$'\t' read -r id name; do
 done < "$dir/assets"
 cmp SHA256SUMS "$verify/SHA256SUMS"
 (cd "$verify" && sha256sum --check --status SHA256SUMS)
-gh api -X PATCH "repos/$repo/releases/$release" -f name="Build $GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT ($BUILD_STATUS)" --silent
+gh api -X PATCH "repos/$repo/releases/$release" -f tag_name="$tag" -f target_commitish="$sha" -F draft=true -f name="Build $GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT ($BUILD_STATUS)" --silent
+gh api "repos/$repo/releases/$release" | jq -e --arg tag "$tag" --arg sha "$sha" '(.draft == true) and (.tag_name == $tag) and (.target_commitish == $sha)' >/dev/null
 trap - ERR
 echo 'Verified delivery to the private repository.'
