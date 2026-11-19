@@ -1,0 +1,10 @@
+name: Check build runner
+on: workflow_dispatch
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify runner starts
+        run: echo 'Build runner is available'
