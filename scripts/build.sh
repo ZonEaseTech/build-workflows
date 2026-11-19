@@ -6,14 +6,21 @@ if [[ "$PROBE" == true ]]; then
   exit 1
 fi
 # Only these two scratch directories are mounted. The guest has no GitHub credentials.
+image=node:22-bookworm
+# Skills uses Python 3.12+ syntax and tests Chromium navigation.
+if [[ "$PROJECT" == skills ]]; then image=node:22-trixie; fi
 docker run --rm --init --cap-drop NET_RAW \
   -v "$dir/source:/src" -v "$dir/output:/out" -w /src \
-  -e GITHUB_ACTIONS=true -e GITHUB_WORKSPACE=/src -e CI=true -e HOME=/root -e RUNNER_TEMP=/tmp \
-  node:22-bookworm bash -euc '
+  -e PROJECT -e GITHUB_ACTIONS=true -e GITHUB_WORKSPACE=/src -e CI=true -e HOME=/root -e RUNNER_TEMP=/tmp \
+  "$image" bash -euc '
     apt-get update -qq
     apt-get install -y -qq zip unzip jq rsync
     git config --global --add safe.directory /src
     corepack enable
     corepack prepare pnpm@10 --activate
+    if [[ "$PROJECT" == skills ]]; then
+      apt-get install -y -qq python3
+      npx --yes playwright install-deps chromium
+    fi
     bash scripts/ci-build.sh /out
   ' >"$dir/build.log" 2>&1
