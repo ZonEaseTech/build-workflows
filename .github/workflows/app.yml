@@ -13,7 +13,7 @@ on:
       platform:
         description: Platform
         type: choice
-        options: [android, ios]
+        options: [android, ios, windows]
         required: true
       target:
         description: 'test / prod / play (play is Android only)'
@@ -62,8 +62,9 @@ jobs:
           [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           case "$PROJECT:$PLATFORM:$TARGET" in
             got-that:android:test|got-that:android:prod|got-that:android:play|got-that:ios:test|got-that:ios:prod) ;;
-            # TTPOS Lite signs only its production Android release bundle here.
-            ttpos-lite:android:prod) ;;
+            # TTPOS Lite signs only its production Android release bundle here;
+            # its unsigned Windows test installer is cross-compiled on Ubuntu without secrets.
+            ttpos-lite:android:prod|ttpos-lite:windows:test) ;;
             *) exit 1 ;;
           esac
           if [[ "$UPLOAD_TESTFLIGHT" == true ]]; then [[ "$PROJECT:$PLATFORM" == got-that:ios ]]; fi
@@ -86,6 +87,14 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
+      - name: Set up .NET for the TTPOS Lite Windows installer
+        if: inputs.project == 'ttpos-lite' && inputs.platform == 'windows'
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install NSIS for the TTPOS Lite Windows installer
+        if: inputs.project == 'ttpos-lite' && inputs.platform == 'windows'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis && makensis -VERSION
       # Each project receives only its own signing material.
       - name: Build and sign
         id: compile
@@ -98,11 +107,11 @@ jobs:
           IOS_CERTIFICATE_PASSWORD: ${{ inputs.project == 'got-that' && inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_PASSWORD || '' }}
           IOS_PROVISION_PROFILE_BASE64: ${{ inputs.project == 'got-that' && inputs.platform == 'ios' && secrets.GOTTHAT_IOS_PROVISION_PROFILE_BASE64 || '' }}
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ inputs.project == 'got-that' && inputs.testflight && secrets.GOTTHAT_APP_STORE_CONNECT_API_KEY_BASE64 || '' }}
-          TTPOS_LITE_ANDROID_KEYSTORE_BASE64: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_BASE64 || '' }}
-          TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD || '' }}
-          TTPOS_LITE_ANDROID_KEY_ALIAS: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEY_ALIAS || '' }}
-          TTPOS_LITE_ANDROID_KEY_PASSWORD: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEY_PASSWORD || '' }}
-          TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM || '' }}
+          TTPOS_LITE_ANDROID_KEYSTORE_BASE64: ${{ inputs.project == 'ttpos-lite' && inputs.platform == 'android' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_BASE64 || '' }}
+          TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD: ${{ inputs.project == 'ttpos-lite' && inputs.platform == 'android' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD || '' }}
+          TTPOS_LITE_ANDROID_KEY_ALIAS: ${{ inputs.project == 'ttpos-lite' && inputs.platform == 'android' && secrets.TTPOS_LITE_ANDROID_KEY_ALIAS || '' }}
+          TTPOS_LITE_ANDROID_KEY_PASSWORD: ${{ inputs.project == 'ttpos-lite' && inputs.platform == 'android' && secrets.TTPOS_LITE_ANDROID_KEY_PASSWORD || '' }}
+          TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM: ${{ inputs.project == 'ttpos-lite' && inputs.platform == 'android' && secrets.TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM || '' }}
           APP_STORE_CONNECT_KEY_ID: J4Y2354964
           APP_STORE_CONNECT_ISSUER_ID: 4c97ef7d-65fd-4227-8804-3583f363ebfa
         run: bash scripts/app.sh
