@@ -5,7 +5,7 @@ on:
       project:
         description: Project
         type: choice
-        options: [skills, shiftly-landing, got-that, outreach, ttpos-cli, ttpos-lite]
+        options: [skills, shiftly-landing, got-that, outreach, zonease-account, zonease-studio, ttpos-bot, ttpos-cli, ttpos-lite]
         required: true
       sha:
         description: Exact approved commit (required with pr; otherwise empty selects main)
@@ -43,7 +43,7 @@ jobs:
         run: |
           # Project key -> private repository, its release branch and the build directory inside it.
           case "$PROJECT" in
-            skills|shiftly-landing|got-that|outreach|ttpos-lite) repo=$PROJECT branch=main subdir= ;;
+            skills|shiftly-landing|got-that|outreach|zonease-account|zonease-studio|ttpos-bot|ttpos-lite) repo=$PROJECT branch=main subdir= ;;
             ttpos-cli) repo=ttpos-server-go branch=release subdir=ttpos-cli ;;
             *) exit 1 ;;
           esac

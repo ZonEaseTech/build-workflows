@@ -29,19 +29,36 @@ CLI_REQUIRED += [f"npm/cli-{p}/{f}" for p in CLI_PLATFORMS for f in ("package.js
 OUTREACH = {".source-commit", "client/install.sh", "client/outreach-data.mjs",
             "client/outreach-data-client.mjs", "client/skill/SKILL.md",
             "client/skill/agents/openai.yaml"}
-if project == "outreach" and {p.name for p in root.iterdir()} != {"outreach-data.zip"}:
-    raise SystemExit("Unexpected consumer output")
+# Consumer-facing candidates are defined by their package name and contents.
+bot_dirs = ["apps/lark-github", *["packages/" + p for p in
+                                ("domain", "github-project", "lark-adapter", "shared", "storage")]]
+CANDIDATES = {
+    "outreach": ("outreach-data.zip", OUTREACH, None),
+    "zonease-account": ("account-site.zip", {".source-commit", "wrangler.jsonc", "src/index.js",
+        *["public/" + p for p in ("index.html", "404.html", "style.css", "_headers", "privacy/index.html",
+                                  "privacy/en/index.html", "privacy/zh/index.html", "terms/index.html")]}, None),
+    "zonease-studio": ("studio.zip", {".source-commit", "server.ts", "dist/index.html", "dist/favicon.svg"},
+                       r"dist/assets/[A-Za-z0-9_.-]+\.(?:js|css|svg|woff2?|png|webp)"),
+    "ttpos-bot": ("ttpos-bot.zip", {".source-commit", *[p + "/dist/index.js" for p in bot_dirs]},
+                  "(?:" + "|".join(map(re.escape, bot_dirs)) + r")/dist/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.js"),
+}
+if project in CANDIDATES and {p.name for p in root.iterdir()} != {CANDIDATES[project][0]}:
+    raise SystemExit("Unexpected candidate output")
 for path in files:
     if path.is_symlink() or not path.is_file() or not re.fullmatch(r"[A-Za-z0-9._-]+\.zip", path.name):
         raise SystemExit("Invalid release output")
     with zipfile.ZipFile(path) as archive:
-        if project == "outreach":
-            entries = archive.infolist()
-            if (len(entries) != len(OUTREACH) or set(archive.namelist()) != OUTREACH
-                    or any(not entry.file_size or stat.S_ISLNK(entry.external_attr >> 16) for entry in entries)):
-                raise SystemExit("Unexpected consumer archive")
+        if project in CANDIDATES:
+            _, required, extra = CANDIDATES[project]
+            names = archive.namelist()
+            if (len(names) != len(set(names)) or not required.issubset(names)
+                    or any(not extra or not re.fullmatch(extra, n) for n in set(names) - required)
+                    or any(not e.file_size or stat.S_ISLNK(e.external_attr >> 16) for e in archive.infolist())):
+                raise SystemExit("Unexpected candidate archive")
+            if project == "zonease-studio" and not any(n.startswith("dist/assets/") and n.endswith(".js") for n in names):
+                raise SystemExit("Missing studio application assets")
             if archive.read(".source-commit").decode().strip() != (root.parent / "sha").read_text().strip():
-                raise SystemExit("Consumer revision mismatch")
+                raise SystemExit("Candidate revision mismatch")
         if project == "got-that":
             names = archive.namelist()
             wanted = [n for n in names if re.fullmatch(GOT_THAT[path.name], n)]
