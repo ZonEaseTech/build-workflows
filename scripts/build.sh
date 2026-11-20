@@ -25,5 +25,7 @@ docker run --rm --init --cap-drop NET_RAW \
       npx --yes playwright install-deps chromium
     fi
     if [[ "$PROJECT" == got-that ]]; then apt-get install -y -qq curl git xz-utils python3 libglu1-mesa; fi
+    # TTPOS Lite checks compile the Android shell (Gradle, JDK 17) and run Python source checks.
+    if [[ "$PROJECT" == ttpos-lite ]]; then apt-get install -y -qq openjdk-17-jdk-headless python3; fi
     bash scripts/ci-build.sh /out || { rc=$?; for log in /tmp/dev.log /tmp/model.log; do if test -f "$log"; then tail -80 "$log"; fi; done; exit "$rc"; }
   ' >"$dir/build.log" 2>&1

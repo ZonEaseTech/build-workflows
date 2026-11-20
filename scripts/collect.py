@@ -17,6 +17,10 @@ if project == "got-that" and {p.name for p in root.iterdir()} not in ({n} for n 
     raise SystemExit("Incomplete GotThat build")
 if project == "ttpos-cli" and {p.name for p in root.iterdir()} != {"ttpos-cli.zip"}:
     raise SystemExit("Incomplete CLI build")
+# TTPOS Lite delivers a verification receipt only; installable packages keep their signed release process.
+LITE_RECEIPT = [".source-commit", "checks.txt", "version.json"]
+if project == "ttpos-lite" and {p.name for p in root.iterdir()} != {"ttpos-lite-checks.zip"}:
+    raise SystemExit("Incomplete TTPOS Lite checks")
 CLI_PLATFORMS = ("linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64")
 CLI_REQUIRED = [".source-commit", "VERSION", "npm/cli/package.json", "bundle/README.md", "bundle/install.sh", "bundle/CHANGELOG.md"]
 CLI_REQUIRED += [f"npm/cli-{p}/{f}" for p in CLI_PLATFORMS for f in ("package.json", "bin/ttpos")]
@@ -45,6 +49,10 @@ for path in files:
                     raise SystemExit("Unexpected CLI archive entry")
                 if name.endswith(".go") or name.endswith((".env", ".pem", ".key")):
                     raise SystemExit("Unexpected CLI archive entry")
+        if project == "ttpos-lite":
+            names = archive.namelist()
+            if sorted(names) != LITE_RECEIPT or any(not archive.getinfo(n).file_size for n in names):
+                raise SystemExit("Unexpected TTPOS Lite checks archive")
         if archive.testzip() is not None:
             raise SystemExit("Invalid zip content")
     shutil.copyfile(path, Path(destination) / path.name)
