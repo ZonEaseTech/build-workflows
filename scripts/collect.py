@@ -10,10 +10,16 @@ root = Path(source)
 files = sorted(root.glob("*.zip"))
 if not files or (project == "shiftly-landing" and {p.name for p in files} != {"app-dist.zip", "deploy.zip"}):
     raise SystemExit("Incomplete release outputs")
+if project == "got-that" and {p.name for p in root.iterdir()} != {"web.zip"}:
+    raise SystemExit("Incomplete web build")
 for path in files:
     if path.is_symlink() or not path.is_file() or not re.fullmatch(r"[A-Za-z0-9._-]+\.zip", path.name):
         raise SystemExit("Invalid release output")
     with zipfile.ZipFile(path) as archive:
+        if project == "got-that":
+            for name in ("main.dart.js", "flutter_bootstrap.js", "index.html", ".source-commit"):
+                if not archive.getinfo(name).file_size:
+                    raise SystemExit("Incomplete web archive")
         if archive.testzip() is not None:
             raise SystemExit("Invalid zip content")
     shutil.copyfile(path, Path(destination) / path.name)
