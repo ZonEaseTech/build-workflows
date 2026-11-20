@@ -1,0 +1,109 @@
+name: Build signed mobile apps
+# Signed Android/iOS packages for an approved main commit, on public runners.
+# Signing material lives only in the main-only private-build environment and is
+# handed to the project script on the host; outputs go to a private draft release.
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project
+        type: choice
+        options: [got-that]
+        required: true
+      platform:
+        description: Platform
+        type: choice
+        options: [android, ios]
+        required: true
+      target:
+        description: 'test / prod / play (play is Android only)'
+        type: choice
+        options: [test, prod, play]
+        default: test
+      testflight:
+        description: Upload the iOS build to TestFlight
+        type: boolean
+        default: false
+      sha:
+        description: Exact approved main commit (empty selects main)
+        type: string
+      diagnostic_test:
+        description: Verify private failure diagnostics
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: app-${{ inputs.project }}-${{ inputs.platform }}-${{ inputs.target }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ inputs.platform == 'ios' && 'macos-26' || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    environment: private-build
+    env:
+      PROJECT: ${{ inputs.project }}
+      REPO: ${{ inputs.project }}
+      BRANCH: main
+      SUBDIR: ''
+      EXPECTED_SHA: ${{ inputs.sha }}
+      PROBE: ${{ inputs.diagnostic_test }}
+      PLATFORM: ${{ inputs.platform }}
+      TARGET: ${{ inputs.target }}
+      UPLOAD_TESTFLIGHT: ${{ inputs.testflight }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          token: ${{ github.token }}
+      - name: Validate request
+        run: |
+          [[ "$PROJECT" == got-that ]]
+          [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          case "$PLATFORM:$TARGET" in android:test|android:prod|android:play|ios:test|ios:prod) ;; *) exit 1 ;; esac
+          if [[ "$UPLOAD_TESTFLIGHT" == true ]]; then [[ "$PLATFORM" == ios ]]; fi
+          if ! command -v sha256sum >/dev/null; then brew install coreutils; fi
+      - name: Authorize source read
+        id: reader
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ secrets.BUILD_APP_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: ZonEaseTech
+          repositories: ${{ inputs.project }}
+          permission-contents: read
+      - name: Resolve approved source
+        env:
+          GH_TOKEN: ${{ steps.reader.outputs.token }}
+        run: bash scripts/source.sh
+      - name: Build and sign
+        id: compile
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_STORE_PASSWORD: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_STORE_PASSWORD || '' }}
+          ANDROID_KEY_PASSWORD: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_ALIAS || '' }}
+          IOS_CERTIFICATE_BASE64: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_BASE64 || '' }}
+          IOS_CERTIFICATE_PASSWORD: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_PASSWORD || '' }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_PROVISION_PROFILE_BASE64 || '' }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ inputs.testflight && secrets.GOTTHAT_APP_STORE_CONNECT_API_KEY_BASE64 || '' }}
+          APP_STORE_CONNECT_KEY_ID: J4Y2354964
+          APP_STORE_CONNECT_ISSUER_ID: 4c97ef7d-65fd-4227-8804-3583f363ebfa
+        run: bash scripts/app.sh
+      - name: Authorize private delivery
+        if: ${{ !cancelled() && steps.compile.outcome != 'skipped' }}
+        id: writer
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ secrets.BUILD_APP_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: ZonEaseTech
+          repositories: ${{ inputs.project }}
+          permission-contents: write
+      - name: Deliver private files and verify the download
+        if: ${{ !cancelled() && steps.writer.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.writer.outputs.token }}
+          BUILD_STATUS: ${{ steps.compile.outcome }}
+        run: bash scripts/deliver.sh

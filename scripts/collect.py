@@ -10,8 +10,11 @@ root = Path(source)
 files = sorted(root.glob("*.zip"))
 if not files or (project == "shiftly-landing" and {p.name for p in files} != {"app-dist.zip", "deploy.zip"}):
     raise SystemExit("Incomplete release outputs")
-if project == "got-that" and {p.name for p in root.iterdir()} != {"web.zip"}:
-    raise SystemExit("Incomplete web build")
+GOT_THAT = {"web.zip": r"(main\.dart\.js|flutter_bootstrap\.js|index\.html)",
+            "android.zip": r"gotthat-[0-9.]+(-test)?\.apk|gotthat-[0-9.]+-play\.aab",
+            "ios.zip": r"gotthat-[0-9.]+-[0-9]+-(test|prod)\.ipa"}
+if project == "got-that" and {p.name for p in root.iterdir()} not in ({n} for n in GOT_THAT):
+    raise SystemExit("Incomplete GotThat build")
 if project == "ttpos-cli" and {p.name for p in root.iterdir()} != {"ttpos-cli.zip"}:
     raise SystemExit("Incomplete CLI build")
 CLI_PLATFORMS = ("linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64")
@@ -22,9 +25,14 @@ for path in files:
         raise SystemExit("Invalid release output")
     with zipfile.ZipFile(path) as archive:
         if project == "got-that":
-            for name in ("main.dart.js", "flutter_bootstrap.js", "index.html", ".source-commit"):
-                if not archive.getinfo(name).file_size:
-                    raise SystemExit("Incomplete web archive")
+            names = archive.namelist()
+            wanted = [n for n in names if re.fullmatch(GOT_THAT[path.name], n)]
+            if not archive.getinfo(".source-commit").file_size or not wanted or any(not archive.getinfo(n).file_size for n in wanted):
+                raise SystemExit("Incomplete GotThat archive")
+            if path.name == "web.zip" and len(wanted) != 3:
+                raise SystemExit("Incomplete web archive")
+            if path.name != "web.zip" and (len(wanted) != 1 or set(names) - set(wanted) - {".source-commit", ".testflight-build"}):
+                raise SystemExit("Unexpected app archive entry")
         if project == "ttpos-cli":
             names = archive.namelist()
             for name in CLI_REQUIRED:
