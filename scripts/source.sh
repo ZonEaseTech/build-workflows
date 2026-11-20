@@ -9,7 +9,10 @@ if [[ "$PROJECT" == got-that ]]; then
   main=$(gh api "repos/$repo/commits/main" --jq .sha)
   sha=${EXPECTED_SHA:-$main}
   if [[ -n "${PR_NUMBER:-}" ]]; then
-    gh api "repos/$repo/pulls/$PR_NUMBER" | jq -e --arg repo "$repo" --arg sha "$sha"       '.state == "open" and .base.ref == "main" and .head.repo.full_name == $repo and .head.sha == $sha' >/dev/null
+    # contents:read cannot call the pulls API; refs show the PR head and that it is still a branch tip here.
+    auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+    refs=$(git -c "http.extraHeader=Authorization: Basic $auth" ls-remote "https://github.com/$repo.git" "refs/pull/$PR_NUMBER/head" 'refs/heads/*' 2>/dev/null)
+    awk -v sha="$sha" -v pr="refs/pull/$PR_NUMBER/head" '$1 == sha && $2 == pr { p=1 } $1 == sha && $2 ~ /^refs\/heads\// { h=1 } END { exit !(p && h) }' <<< "$refs" || { echo 'Reviewed commit changed'; exit 1; }
   else
     [[ "$sha" == "$main" ]]
   fi
