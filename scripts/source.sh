@@ -4,7 +4,7 @@ dir="$RUNNER_TEMP/private-build"
 mkdir -p "$dir"/{source,output}
 cd "$dir/source"
 # Export only an approved snapshot for projects whose history is restricted.
-if [[ "$PROJECT" =~ ^(got-that|outreach|zonease-account|zonease-studio|new-api|ttpos-bot)$ ]]; then
+if [[ "$PROJECT" == got-that || "$PROJECT" == outreach ]]; then
   repo="ZonEaseTech/$PROJECT"
   main=$(gh api "repos/$repo/commits/main" --jq .sha)
   sha=${EXPECTED_SHA:-$main}

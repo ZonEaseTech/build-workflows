@@ -24,7 +24,7 @@ docker run --rm --init --cap-drop NET_RAW \
       apt-get install -y -qq python3
       npx --yes playwright install-deps chromium
     fi
-    if [[ "$PROJECT" =~ ^(outreach|zonease-account|zonease-studio|new-api|ttpos-bot)$ ]]; then apt-get install -y -qq python3; fi
+    if [[ "$PROJECT" == outreach ]]; then apt-get install -y -qq python3; fi
     if [[ "$PROJECT" == got-that ]]; then apt-get install -y -qq curl git xz-utils python3 libglu1-mesa; fi
     # TTPOS Lite checks compile the Android shell (Gradle, JDK 17) and run Python source checks.
     if [[ "$PROJECT" == ttpos-lite ]]; then apt-get install -y -qq openjdk-17-jdk-headless python3; fi
