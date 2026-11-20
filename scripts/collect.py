@@ -39,6 +39,7 @@ CANDIDATES = {
                                   "privacy/en/index.html", "privacy/zh/index.html", "terms/index.html")]}, None),
     "zonease-studio": ("studio.zip", {".source-commit", "server.ts", "dist/index.html", "dist/favicon.svg"},
                        r"dist/assets/[A-Za-z0-9_.-]+\.(?:js|css|svg|woff2?|png|webp)"),
+    "new-api": ("new-api-linux-amd64.zip", {".source-commit", "new-api", "LICENSE", "NOTICE", "THIRD-PARTY-LICENSES.md"}, None),
     "ttpos-bot": ("ttpos-bot.zip", {".source-commit", *[p + "/dist/index.js" for p in bot_dirs]},
                   "(?:" + "|".join(map(re.escape, bot_dirs)) + r")/dist/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.js"),
 }
