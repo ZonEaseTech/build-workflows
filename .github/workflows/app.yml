@@ -8,7 +8,7 @@ on:
       project:
         description: Project
         type: choice
-        options: [got-that]
+        options: [got-that, ttpos-lite]
         required: true
       platform:
         description: Platform
@@ -59,10 +59,14 @@ jobs:
           token: ${{ github.token }}
       - name: Validate request
         run: |
-          [[ "$PROJECT" == got-that ]]
           [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
-          case "$PLATFORM:$TARGET" in android:test|android:prod|android:play|ios:test|ios:prod) ;; *) exit 1 ;; esac
-          if [[ "$UPLOAD_TESTFLIGHT" == true ]]; then [[ "$PLATFORM" == ios ]]; fi
+          case "$PROJECT:$PLATFORM:$TARGET" in
+            got-that:android:test|got-that:android:prod|got-that:android:play|got-that:ios:test|got-that:ios:prod) ;;
+            # TTPOS Lite signs only its production Android release bundle here.
+            ttpos-lite:android:prod) ;;
+            *) exit 1 ;;
+          esac
+          if [[ "$UPLOAD_TESTFLIGHT" == true ]]; then [[ "$PROJECT:$PLATFORM" == got-that:ios ]]; fi
           if ! command -v sha256sum >/dev/null; then brew install coreutils; fi
       - name: Authorize source read
         id: reader
@@ -77,17 +81,28 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.reader.outputs.token }}
         run: bash scripts/source.sh
+      - name: Set up Node.js for TTPOS Lite
+        if: inputs.project == 'ttpos-lite'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      # Each project receives only its own signing material.
       - name: Build and sign
         id: compile
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEYSTORE_BASE64 || '' }}
-          ANDROID_STORE_PASSWORD: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_STORE_PASSWORD || '' }}
-          ANDROID_KEY_PASSWORD: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_PASSWORD || '' }}
-          ANDROID_KEY_ALIAS: ${{ inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_ALIAS || '' }}
-          IOS_CERTIFICATE_BASE64: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_BASE64 || '' }}
-          IOS_CERTIFICATE_PASSWORD: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_PASSWORD || '' }}
-          IOS_PROVISION_PROFILE_BASE64: ${{ inputs.platform == 'ios' && secrets.GOTTHAT_IOS_PROVISION_PROFILE_BASE64 || '' }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ inputs.testflight && secrets.GOTTHAT_APP_STORE_CONNECT_API_KEY_BASE64 || '' }}
+          ANDROID_KEYSTORE_BASE64: ${{ inputs.project == 'got-that' && inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_STORE_PASSWORD: ${{ inputs.project == 'got-that' && inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_STORE_PASSWORD || '' }}
+          ANDROID_KEY_PASSWORD: ${{ inputs.project == 'got-that' && inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ inputs.project == 'got-that' && inputs.platform == 'android' && secrets.GOTTHAT_ANDROID_KEY_ALIAS || '' }}
+          IOS_CERTIFICATE_BASE64: ${{ inputs.project == 'got-that' && inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_BASE64 || '' }}
+          IOS_CERTIFICATE_PASSWORD: ${{ inputs.project == 'got-that' && inputs.platform == 'ios' && secrets.GOTTHAT_IOS_CERTIFICATE_PASSWORD || '' }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ inputs.project == 'got-that' && inputs.platform == 'ios' && secrets.GOTTHAT_IOS_PROVISION_PROFILE_BASE64 || '' }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ inputs.project == 'got-that' && inputs.testflight && secrets.GOTTHAT_APP_STORE_CONNECT_API_KEY_BASE64 || '' }}
+          TTPOS_LITE_ANDROID_KEYSTORE_BASE64: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_BASE64 || '' }}
+          TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEYSTORE_PASSWORD || '' }}
+          TTPOS_LITE_ANDROID_KEY_ALIAS: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEY_ALIAS || '' }}
+          TTPOS_LITE_ANDROID_KEY_PASSWORD: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_ANDROID_KEY_PASSWORD || '' }}
+          TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM: ${{ inputs.project == 'ttpos-lite' && secrets.TTPOS_LITE_APP_UPDATE_PRIVATE_KEY_PEM || '' }}
           APP_STORE_CONNECT_KEY_ID: J4Y2354964
           APP_STORE_CONNECT_ISSUER_ID: 4c97ef7d-65fd-4227-8804-3583f363ebfa
         run: bash scripts/app.sh
