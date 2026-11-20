@@ -5,7 +5,7 @@ on:
       project:
         description: Project
         type: choice
-        options: [skills, shiftly-landing, got-that]
+        options: [skills, shiftly-landing, got-that, ttpos-cli]
         required: true
       sha:
         description: Exact approved commit (required with pr; otherwise empty selects main)
@@ -39,12 +39,26 @@ jobs:
           persist-credentials: false
           token: ${{ github.token }}
       - name: Validate request
+        id: request
         run: |
-          case "$PROJECT" in skills|shiftly-landing|got-that) ;; *) exit 1 ;; esac
+          # Project key -> private repository, its release branch and the build directory inside it.
+          case "$PROJECT" in
+            skills|shiftly-landing|got-that) repo=$PROJECT branch=main subdir= ;;
+            ttpos-cli) repo=ttpos-server-go branch=release subdir=ttpos-cli ;;
+            *) exit 1 ;;
+          esac
+          printf 'repo=%s\nbranch=%s\nsubdir=%s\n' "$repo" "$branch" "$subdir" >> "$GITHUB_OUTPUT"
           [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           if [[ -n "$PR_NUMBER" ]]; then
             [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           fi
+      - name: Record project mapping
+        run: |
+          {
+            echo "REPO=${{ steps.request.outputs.repo }}"
+            echo "BRANCH=${{ steps.request.outputs.branch }}"
+            echo "SUBDIR=${{ steps.request.outputs.subdir }}"
+          } >> "$GITHUB_ENV"
       - name: Authorize source read
         id: reader
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
@@ -52,7 +66,7 @@ jobs:
           app-id: ${{ secrets.BUILD_APP_ID }}
           private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
           owner: ZonEaseTech
-          repositories: ${{ inputs.project }}
+          repositories: ${{ steps.request.outputs.repo }}
           permission-contents: read
       - name: Resolve approved source
         env:
@@ -69,7 +83,7 @@ jobs:
           app-id: ${{ secrets.BUILD_APP_ID }}
           private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
           owner: ZonEaseTech
-          repositories: ${{ inputs.project }}
+          repositories: ${{ steps.request.outputs.repo }}
           permission-contents: write
       - name: Deliver private files and verify the download
         if: ${{ !cancelled() && steps.writer.outcome == 'success' }}

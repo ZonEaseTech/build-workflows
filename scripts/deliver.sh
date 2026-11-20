@@ -2,7 +2,7 @@ set -euo pipefail
 umask 077
 dir="$RUNNER_TEMP/private-build"
 sha=$(cat "$dir/sha")
-repo="ZonEaseTech/$PROJECT"
+repo="ZonEaseTech/$REPO"
 tag="build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 label="Build $GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
 if [[ -n "${PR_NUMBER:-}" ]]; then
