@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import shutil
+import stat
 import sys
 import zipfile
 
@@ -25,10 +26,22 @@ if project == "ttpos-lite" and {p.name for p in root.iterdir()} not in ({"ttpos-
 CLI_PLATFORMS = ("linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64")
 CLI_REQUIRED = [".source-commit", "VERSION", "npm/cli/package.json", "bundle/README.md", "bundle/install.sh", "bundle/CHANGELOG.md"]
 CLI_REQUIRED += [f"npm/cli-{p}/{f}" for p in CLI_PLATFORMS for f in ("package.json", "bin/ttpos")]
+OUTREACH = {".source-commit", "client/install.sh", "client/outreach-data.mjs",
+            "client/outreach-data-client.mjs", "client/skill/SKILL.md",
+            "client/skill/agents/openai.yaml"}
+if project == "outreach" and {p.name for p in root.iterdir()} != {"outreach-data.zip"}:
+    raise SystemExit("Unexpected consumer output")
 for path in files:
     if path.is_symlink() or not path.is_file() or not re.fullmatch(r"[A-Za-z0-9._-]+\.zip", path.name):
         raise SystemExit("Invalid release output")
     with zipfile.ZipFile(path) as archive:
+        if project == "outreach":
+            entries = archive.infolist()
+            if (len(entries) != len(OUTREACH) or set(archive.namelist()) != OUTREACH
+                    or any(not entry.file_size or stat.S_ISLNK(entry.external_attr >> 16) for entry in entries)):
+                raise SystemExit("Unexpected consumer archive")
+            if archive.read(".source-commit").decode().strip() != (root.parent / "sha").read_text().strip():
+                raise SystemExit("Consumer revision mismatch")
         if project == "got-that":
             names = archive.namelist()
             wanted = [n for n in names if re.fullmatch(GOT_THAT[path.name], n)]
