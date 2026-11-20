@@ -12,7 +12,7 @@ if [[ "$PROJECT" == skills ]]; then image=node:22-trixie; fi
 SOURCE_COMMIT=$(cat "$dir/sha")
 export SOURCE_COMMIT
 docker run --rm --init --cap-drop NET_RAW \
-  -v "$dir/source:/src" -v "$dir/output:/out" -w /src \
+  -v "$dir/source:/src" -v "$dir/output:/out" -w "/src${SUBDIR:+/$SUBDIR}" \
   -e PROJECT -e SOURCE_COMMIT -e GITHUB_ACTIONS=true -e GITHUB_WORKSPACE=/src -e CI=true -e HOME=/root -e RUNNER_TEMP=/tmp \
   "$image" bash -euc '
     apt-get update -qq
