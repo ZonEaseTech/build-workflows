@@ -4,7 +4,7 @@ dir="$RUNNER_TEMP/private-build"
 mkdir -p "$dir"/{source,output}
 cd "$dir/source"
 # Export only an approved snapshot for projects whose history is restricted.
-if [[ "$PROJECT" == got-that ]]; then
+if [[ "$PROJECT" == got-that || "$PROJECT" == outreach ]]; then
   repo="ZonEaseTech/$PROJECT"
   main=$(gh api "repos/$repo/commits/main" --jq .sha)
   sha=${EXPECTED_SHA:-$main}
@@ -17,8 +17,10 @@ if [[ "$PROJECT" == got-that ]]; then
     [[ "$sha" == "$main" ]]
   fi
   # A trusted lower bound prevents exporting an older tree, including an old PR.
-  floor=$(cat "$GITHUB_WORKSPACE/scripts/got-that-minimum-sha")
-  gh api "repos/$repo/compare/$floor...$sha" --jq .status | grep -Eq '^(identical|ahead)$'
+  if [[ "$PROJECT" == got-that ]]; then
+    floor=$(cat "$GITHUB_WORKSPACE/scripts/got-that-minimum-sha")
+    gh api "repos/$repo/compare/$floor...$sha" --jq .status | grep -Eq '^(identical|ahead)$'
+  fi
   gh api "repos/$repo/tarball/$sha" | tar -xz --strip-components=1
   printf '%s\n' "$sha" > "$dir/sha"
   exit 0
