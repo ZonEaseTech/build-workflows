@@ -9,9 +9,11 @@ fi
 image=node:22-bookworm
 # Skills uses Python 3.12+ syntax and tests Chromium navigation.
 if [[ "$PROJECT" == skills ]]; then image=node:22-trixie; fi
+SOURCE_COMMIT=$(cat "$dir/sha")
+export SOURCE_COMMIT
 docker run --rm --init --cap-drop NET_RAW \
   -v "$dir/source:/src" -v "$dir/output:/out" -w /src \
-  -e PROJECT -e GITHUB_ACTIONS=true -e GITHUB_WORKSPACE=/src -e CI=true -e HOME=/root -e RUNNER_TEMP=/tmp \
+  -e PROJECT -e SOURCE_COMMIT -e GITHUB_ACTIONS=true -e GITHUB_WORKSPACE=/src -e CI=true -e HOME=/root -e RUNNER_TEMP=/tmp \
   "$image" bash -euc '
     apt-get update -qq
     apt-get install -y -qq zip unzip jq rsync
@@ -22,5 +24,6 @@ docker run --rm --init --cap-drop NET_RAW \
       apt-get install -y -qq python3
       npx --yes playwright install-deps chromium
     fi
+    if [[ "$PROJECT" == got-that ]]; then apt-get install -y -qq curl git xz-utils python3 libglu1-mesa; fi
     bash scripts/ci-build.sh /out || { rc=$?; for log in /tmp/dev.log /tmp/model.log; do if test -f "$log"; then tail -80 "$log"; fi; done; exit "$rc"; }
   ' >"$dir/build.log" 2>&1

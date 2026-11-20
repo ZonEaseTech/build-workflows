@@ -5,7 +5,7 @@ on:
       project:
         description: Project
         type: choice
-        options: [skills, shiftly-landing]
+        options: [skills, shiftly-landing, got-that]
         required: true
       sha:
         description: Exact approved commit (required with pr; otherwise empty selects main)
@@ -26,7 +26,7 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 90
     environment: private-build
     env:
       PROJECT: ${{ inputs.project }}
@@ -40,7 +40,7 @@ jobs:
           token: ${{ github.token }}
       - name: Validate request
         run: |
-          case "$PROJECT" in skills|shiftly-landing) ;; *) exit 1 ;; esac
+          case "$PROJECT" in skills|shiftly-landing|got-that) ;; *) exit 1 ;; esac
           [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           if [[ -n "$PR_NUMBER" ]]; then
             [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]

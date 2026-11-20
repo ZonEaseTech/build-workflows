@@ -1,6 +1,6 @@
 # ZonEaseTech build workflows
 
-Build and verify private release candidates for the ZonEaseTech skills and Shiftly projects. An authorized maintainer can run **Build private release candidates** on main, select the project, and optionally select an exact commit reachable from its main branch. Each project also provides a private dispatch entry point.
+Build and verify private release candidates for the ZonEaseTech skills, Shiftly and GotThat (`got-that`) projects. GotThat sources are exported as a tarball of an approved main commit at or after `scripts/got-that-minimum-sha`, so older history never reaches the runner. An authorized maintainer can run **Build private release candidates** on main, select the project, and optionally select an exact commit reachable from its main branch. Each project also provides a private dispatch entry point.
 
 The selected revision supplies its build recipe in `scripts/ci-build.sh`. Builds use an isolated Node.js container. Credentials stay on the runner outside that container. Each attempt writes its outputs, diagnostic log, source revision and checksums to a draft Release in the source repository, then downloads and verifies the files. Failed builds deliver diagnostics only. The diagnostic test exercises this failure path.
 

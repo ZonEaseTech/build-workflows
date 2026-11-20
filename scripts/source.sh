@@ -3,6 +3,23 @@ umask 077
 dir="$RUNNER_TEMP/private-build"
 mkdir -p "$dir"/{source,output}
 cd "$dir/source"
+# Export only an approved snapshot for projects whose history is restricted.
+if [[ "$PROJECT" == got-that ]]; then
+  repo="ZonEaseTech/$PROJECT"
+  main=$(gh api "repos/$repo/commits/main" --jq .sha)
+  sha=${EXPECTED_SHA:-$main}
+  if [[ -n "${PR_NUMBER:-}" ]]; then
+    gh api "repos/$repo/pulls/$PR_NUMBER" | jq -e --arg repo "$repo" --arg sha "$sha"       '.state == "open" and .base.ref == "main" and .head.repo.full_name == $repo and .head.sha == $sha' >/dev/null
+  else
+    [[ "$sha" == "$main" ]]
+  fi
+  # A trusted lower bound prevents exporting an older tree, including an old PR.
+  floor=$(cat "$GITHUB_WORKSPACE/scripts/got-that-minimum-sha")
+  gh api "repos/$repo/compare/$floor...$sha" --jq .status | grep -Eq '^(identical|ahead)$'
+  gh api "repos/$repo/tarball/$sha" | tar -xz --strip-components=1
+  printf '%s\n' "$sha" > "$dir/sha"
+  exit 0
+fi
 git init -q
 git remote add origin "https://github.com/ZonEaseTech/$PROJECT.git"
 auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
