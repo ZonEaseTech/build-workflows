@@ -17,10 +17,11 @@ if project == "got-that" and {p.name for p in root.iterdir()} not in ({n} for n 
     raise SystemExit("Incomplete GotThat build")
 if project == "ttpos-cli" and {p.name for p in root.iterdir()} != {"ttpos-cli.zip"}:
     raise SystemExit("Incomplete CLI build")
-# TTPOS Lite delivers a verification receipt only; installable packages keep their signed release process.
+# TTPOS Lite: build.yml delivers a verification receipt; app.yml delivers the signed Android release bundle.
 LITE_RECEIPT = [".source-commit", "checks.txt", "version.json"]
-if project == "ttpos-lite" and {p.name for p in root.iterdir()} != {"ttpos-lite-checks.zip"}:
-    raise SystemExit("Incomplete TTPOS Lite checks")
+LITE_APK = r"dcc-pos-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-android-universal\.apk"
+if project == "ttpos-lite" and {p.name for p in root.iterdir()} not in ({"ttpos-lite-checks.zip"}, {"android-release.zip"}):
+    raise SystemExit("Incomplete TTPOS Lite outputs")
 CLI_PLATFORMS = ("linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64")
 CLI_REQUIRED = [".source-commit", "VERSION", "npm/cli/package.json", "bundle/README.md", "bundle/install.sh", "bundle/CHANGELOG.md"]
 CLI_REQUIRED += [f"npm/cli-{p}/{f}" for p in CLI_PLATFORMS for f in ("package.json", "bin/ttpos")]
@@ -51,8 +52,10 @@ for path in files:
                     raise SystemExit("Unexpected CLI archive entry")
         if project == "ttpos-lite":
             names = archive.namelist()
-            if sorted(names) != LITE_RECEIPT or any(not archive.getinfo(n).file_size for n in names):
-                raise SystemExit("Unexpected TTPOS Lite checks archive")
+            apks = [n for n in names if re.fullmatch(LITE_APK, n)]
+            wanted = LITE_RECEIPT if path.name == "ttpos-lite-checks.zip" else sorted([".source-commit", "update.json", *apks])
+            if (path.name == "android-release.zip" and len(apks) != 1) or sorted(names) != wanted or any(not archive.getinfo(n).file_size for n in names):
+                raise SystemExit("Unexpected TTPOS Lite archive")
         if archive.testzip() is not None:
             raise SystemExit("Invalid zip content")
     shutil.copyfile(path, Path(destination) / path.name)
