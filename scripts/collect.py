@@ -9,7 +9,7 @@ import zipfile
 project, source, destination = sys.argv[1:]
 root = Path(source)
 files = sorted(root.glob("*.zip"))
-if not files or (project == "shiftly-landing" and {p.name for p in files} != {"app-dist.zip", "deploy.zip"}):
+if not files or (project == "shiftmochi" and {p.name for p in files} != {"app-dist.zip", "deploy.zip"}):
     raise SystemExit("Incomplete release outputs")
 GOT_THAT = {"web.zip": r"(main\.dart\.js|flutter_bootstrap\.js|index\.html)",
             "android.zip": r"gotthat-[0-9.]+(-test)?\.apk|gotthat-[0-9.]+-play\.aab",
